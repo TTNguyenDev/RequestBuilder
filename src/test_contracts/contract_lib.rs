@@ -12,16 +12,16 @@
  */
 
 // To conserve gas, efficient serialization is achieved through Borsh (http://borsh.io/)
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize}; //ALo
 use near_sdk::{env, near_bindgen, setup_alloc};
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::/*LookupSet*/LookupMap;
 
 setup_alloc!();
 
 // Structs in Rust are similar to other languages, and may include impl keyword as shown below
 // Note: the names of the structs are not important when calling the smart contract, but the function names are
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize)] //Hello 1233
 pub struct Welcome {
     records: LookupMap<String, String>,
 }
@@ -44,7 +44,10 @@ impl Welcome {
 
         self.records.insert(&account_id, &abcasfjdakdasdas);
     }
+}
 
+#[near_bindgen]
+impl Welcome {
     #[payable]
     pub fn greeting(&mut self, message: String) {
         let account_id = env::signer_account_id();
