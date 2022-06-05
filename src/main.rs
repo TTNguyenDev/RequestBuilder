@@ -1,7 +1,7 @@
 use pcre2::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{Write, BufReader, BufRead, Error};
 use std::str;
 use substring::Substring;
 
@@ -130,27 +130,18 @@ fn main() {
 
                 println!("contract_fn: {:#?}", contract_fn);
 
-
-                serde_json::to_string(&contract_fn).unwrap()
+                contract_fn
             })
-            .collect::<Vec<String>>();
+            .collect::<Vec<ContractFunction>>();
         abi
-    }).collect::<Vec<String>>();
+    }).collect::<Vec<ContractFunction>>();
     
 
     //TODO: Save as abi file
-}
+    let path = "./output.abi";
+    let mut output = File::create(path).expect("Can't create file");
+    write!(output, "{}", serde_json::to_string(&abi).unwrap()).unwrap();
 
-fn _check_tag_line(line: String) -> Option<FunctionTag> {
-    if line == "#[init]" {
-        Some(FunctionTag::Init)
-    } else if line == "#[payable]" {
-        Some(FunctionTag::Payable)
-    } else if line == "#[private]" {
-        Some(FunctionTag::Private)
-    } else {
-        None
-    }
 }
 
 fn parse_params_(params_string: String) -> (String, Vec<ContractParam>) {
@@ -166,9 +157,9 @@ fn parse_params_(params_string: String) -> (String, Vec<ContractParam>) {
                 let r = v.split(':').collect::<Vec<&str>>();
                 if r.len() == 1 {
                     if r[0] == "&mut self" {
-                        fn_type = "WRITE".to_string();
+                        fn_type = "read".to_string();
                     } else {
-                        fn_type = "READ".to_string();
+                        fn_type = "write".to_string();
                     }
                     None
                 } else {
