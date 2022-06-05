@@ -37,7 +37,7 @@ impl Gamble {
     // The new function should be called to initialize the contract, and set the gamble_max_price and the gamble_min_price
     #[init]
     pub fn new() -> Self {
-        
+       
         let account_balance = env::account_balance();
         let gamble_max_price = account_balance / (5 * FACTOR);
         log!("we have {} uints in total, be sure not to exceed the max gamble price limit {} to get {}X \n", account_balance, gamble_max_price, FACTOR);
@@ -47,7 +47,7 @@ impl Gamble {
             gamble_min_price : 0,
         }
     }
-
+    //
     // Get the Minimum amount of near to be transfered(Used for dapp, but usually won't as it's 0 all the time)
     pub fn get_minimal_gamble_price(&self) -> u128 {
         self.gamble_min_price

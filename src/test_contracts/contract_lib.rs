@@ -36,11 +36,29 @@ impl Default for Welcome {
 
 #[near_bindgen]
 impl Welcome {
-    pub fn set_greeting(&mut self, name: String, number: u16, name_1: String) {
+    #[init]
+    pub fn alo(&mut self,
+                        name: string,
+                        number: u16, //number 
+                        name_1: string
+                        ) {
         let account_id = env::signer_account_id();
 
-        // Use env::log to record logs permanently to the blockchain!
-        env::log(format!("Saving greeting '{}' for account '{}'", abcasfjdakdasdas, account_id).as_bytes());
+        // use env::log to record logs permanently to the blockchain!
+        env::log(format!("saving greeting '{}' for account '{}'", abcasfjdakdasdas, account_id).as_bytes());
+
+        self.records.insert(&account_id, &abcasfjdakdasdas);
+    }
+
+    pub fn set_greeting(&mut self,
+                        name: string,
+                        number: u16, //number 
+                        name_1: string
+                        ) {
+        let account_id = env::signer_account_id();
+
+        // use env::log to record logs permanently to the blockchain!
+        env::log(format!("saving greeting '{}' for account '{}'", abcasfjdakdasdas, account_id).as_bytes());
 
         self.records.insert(&account_id, &abcasfjdakdasdas);
     }

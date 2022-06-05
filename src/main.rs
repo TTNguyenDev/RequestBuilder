@@ -1,16 +1,16 @@
-use pcre2::bytes::{Regex, Captures};
+use pcre2::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use substring::Substring;
 use std::str;
+use substring::Substring;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ContractFunction {
     pub name: String,
     pub return_type: String,
     pub params: Vec<ContractParam>,
-    pub fn_type: FunctionType, //READ || WRITE
+    pub fn_type: String, //READ || WRITE
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -24,8 +24,7 @@ struct ContractParam {
 pub enum FunctionType {
     READ,
     WRITE,
-    PAYABLE,
-    INIT,
+    UNKNOWN
 }
 
 //TODO: Deal with near_bindgen tags:
@@ -46,8 +45,6 @@ fn main() {
     let filename = "./src/test_contracts/contract_lib.rs";
     let file = File::open(filename).unwrap();
     let reader = BufReader::new(file);
-
-    // let mut scope_seperate_stack = vec![];
 
     //Remove comment  //
     let one_line_data = reader
@@ -70,8 +67,6 @@ fn main() {
         .collect::<Vec<String>>()
         .join(" ");
 
-    println!("{:#?}", one_line_data);
-
     //Remove /**/
     let useful_code = one_line_data
         .split("/*")
@@ -79,79 +74,74 @@ fn main() {
         .collect::<Vec<String>>()
         .join(" ");
 
-    println!("\n\n\n");
     let re = Regex::new(r"{(?:[^{}]+|(?R))*}").unwrap();
-    for result in re.captures_iter(useful_code.as_bytes()) {
-        let caps = result.unwrap();
+    let abi = re.captures_iter(useful_code.as_bytes()).flat_map(|v| {
+        let caps = v.unwrap();
 
-        let scope_str = str::from_utf8(caps.get(0).unwrap().as_bytes()).ok().unwrap();
-        // println!("{}", scope_str);
+        let scope_str = str::from_utf8(caps.get(0).unwrap().as_bytes())
+            .ok()
+            .unwrap();
+
         //Extract functions
-        let fn_regex = Regex::new(r"pub fn [a-z_]+(\((?:`[()]|[^()]|(?1))*\))").unwrap();
-        
-        for fn_name in fn_regex.captures_iter(scope_str.as_bytes()) {
-            println!("fn_name: {:#?}", fn_name);
-        }
-    }
+        let fn_regex = Regex::new(r"(?:#\[(?P<fn_macro>\w*)] )?(?:pub fn) (?P<fn_name>\w*)(?P<fn_params>\((?:`[()]|[^()]|(?1))*\)) (?:-> (?P<return_type>\w*))?").unwrap();
+        let abi = fn_regex
+            .captures_iter(scope_str.as_bytes())
+            .map(|v| {
+                let caps = v.unwrap();
+                let full_fn = str::from_utf8(caps.get(0).unwrap().as_bytes())
+                    .ok()
+                    .unwrap();
 
-    // for (index, line) in reader.lines().into_iter().enumerate() {
-    //     let unwraped_data = line.unwrap();
-    //     let trimmed_line= unwraped_data.trim();
-    //
-    //     // println!("stack {:#?} {:#?}", scope_seperate_stack, trimmed_line);
-    //
-    //     //NOTE: Handle comment
-    //     if trimmed_line.starts_with("//") {
-    //         continue;
-    //     }
-    //
-    //     for c in trimmed_line.chars() {
-    //
-    //     }
-    //
-    //     if trimmed_line.contains("/*") {
-    //         scope_seperate_stack.push("/*");
-    //     }
-    //
-    //     if trimmed_line.contains("*/") && scope_seperate_stack.last().unwrap().eq(&"/*".to_string()) {
-    //         scope_seperate_stack.pop();
-    //         continue;
-    //     }
-    //
-    //     if !scope_seperate_stack.is_empty() && scope_seperate_stack.last().unwrap().eq(&"/*".to_string()) {
-    //         continue;
-    //     }
-    //     println!("Non comment code {:#?} {:?}", index, trimmed_line);
-    //
-    //
-    //
-    // }
+                println!("\n\n\nfn {:#?}", full_fn);
+                let name = str::from_utf8(&caps["fn_name"]).unwrap().to_string();
+                // let fn_macro = str::from_utf8(&caps["fn_macro"]);
+                let fn_params = str::from_utf8(&caps["fn_params"]).unwrap();
 
-    // let mut extracted_data: Vec<String> = vec![];
-    // let mut holding_tag: Option<FunctionTag> = None;
-    // for (_index, data) in reader.lines().into_iter().enumerate() {
-    //     let unwraped_data = data.unwrap();
-    //     let trimmed_data = unwraped_data.trim();
-    //
-    //     if is_pub_fn_parttern(trimmed_data.to_string()) {
-    //         if let Some(parsed_data) = parse_contract_methods(trimmed_data.to_string(), holding_tag) {
-    //             extracted_data.push(serde_json::to_string(&parsed_data).unwrap());
-    //         }
-    //     }
-    //
-    //     holding_tag = check_tag_line(trimmed_data.to_string());
-    // }
-    //
-    // for i in extracted_data {
-    //     println!("{}", i);
-    // }
+                let return_type_u8 = if let Some(rt) = caps.name("return_type") {
+                    rt.as_bytes()
+                } else {
+                    "".as_bytes()
+                };
 
-    // let json_object = serde_json::to_string(&contract_fn).unwrap();
-    // println!("Contract-fn: {} \n\n", json_object);
-    // contract_fn
+                let macro_u8 = if let Some(m) = caps.name("fn_macro") {
+                    m.as_bytes()
+                } else {
+                    "".as_bytes()
+                };
+
+                let return_type = str::from_utf8(return_type_u8).unwrap().to_string();
+                let fn_macro = str::from_utf8(macro_u8).unwrap();
+
+                let contract_fn = if fn_macro.is_empty() {
+                 ContractFunction {
+                    name,
+                    return_type,
+                    params: parse_params_(fn_params.to_string()).1,
+                    fn_type: parse_params_(fn_params.to_string()).0 
+                } 
+                } else {
+                 ContractFunction {
+                    name,
+                    return_type,
+                    params: parse_params_(fn_params.to_string()).1,
+                    fn_type: fn_macro.to_string()
+                } 
+                };
+
+                println!("contract_fn: {:#?}", contract_fn);
+
+
+                serde_json::to_string(&contract_fn).unwrap()
+            })
+            .collect::<Vec<String>>();
+        abi
+    }).collect::<Vec<String>>();
+    
+
+    //TODO: Save as abi file
 }
 
-fn check_tag_line(line: String) -> Option<FunctionTag> {
+fn _check_tag_line(line: String) -> Option<FunctionTag> {
     if line == "#[init]" {
         Some(FunctionTag::Init)
     } else if line == "#[payable]" {
@@ -163,86 +153,33 @@ fn check_tag_line(line: String) -> Option<FunctionTag> {
     }
 }
 
-fn is_pub_fn_parttern(line: String) -> bool {
-    //TODO: Handle this case /**/
-    if line.contains("pub") && line.contains("fn") && !line.starts_with("//") {
-        return true;
-    }
-    false
-}
+fn parse_params_(params_string: String) -> (String, Vec<ContractParam>) {
+    let params = params_string.substring(1, params_string.len() - 1);
 
-fn parse_contract_methods(line: String, tag: Option<FunctionTag>) -> Option<ContractFunction> {
-    if let Some(tag) = tag {
-        match tag {
-            FunctionTag::Private => None,
-            FunctionTag::Init | FunctionTag::Payable => {
-                let skip = 1;
-
-                let params_start = line.find('(').unwrap();
-                let params_end = line.find(')').unwrap();
-
-                let fn_index = line.find("fn").unwrap();
-                let fn_name = line.substring(fn_index + "fn".len(), params_start).trim();
-
-                let params = line.substring(params_start + 1, params_end);
-                let params_list: Vec<&str> = params.split(',').collect();
-
-                let fn_type = if tag == FunctionTag::Init {
-                    FunctionType::INIT
-                } else {
-                    FunctionType::PAYABLE
-                };
-
-                Some(ContractFunction {
-                    name: fn_name.to_string(),
-                    return_type: "".to_string(),
-                    params: parse_params(params_list, skip),
-                    fn_type,
-                })
-            }
-        }
+    if params.is_empty() {
+        ("".to_string(), vec![])
     } else {
-        let skip = if line.contains("self") {
-            //Handle 3 cases: &mut self, self, &self
-            1
-        } else {
-            0
-        };
-
-        let params_start = line.find('(').unwrap();
-        let params_end = line.find(')').unwrap();
-
-        let fn_index = line.find("fn").unwrap();
-        let fn_name = line.substring(fn_index + "fn".len(), params_start).trim();
-
-        let params = line.substring(params_start + 1, params_end);
-        let params_list: Vec<&str> = params.split(',').collect();
-
-        let fn_type = if line.contains("&mut self") {
-            FunctionType::WRITE
-        } else {
-            FunctionType::READ
-        };
-
-        Some(ContractFunction {
-            name: fn_name.to_string(),
-            return_type: "".to_string(),
-            params: parse_params(params_list, skip),
-            fn_type,
-        })
+        let mut fn_type = "".to_string();
+        let param_pairs = params
+            .split(',')
+            .filter_map(|v| {
+                let r = v.split(':').collect::<Vec<&str>>();
+                if r.len() == 1 {
+                    if r[0] == "&mut self" {
+                        fn_type = "WRITE".to_string();
+                    } else {
+                        fn_type = "READ".to_string();
+                    }
+                    None
+                } else {
+                    Some(ContractParam {
+                        name: r[0].trim().to_string(),
+                        param_type: r[1].trim().to_string(),
+                    })
+                }
+            })
+            .collect::<Vec<ContractParam>>();
+        (fn_type, param_pairs)
     }
 }
 
-fn parse_params(params_list: Vec<&str>, skip: usize) -> Vec<ContractParam> {
-    let mut final_params = vec![];
-    for param in params_list.iter().skip(skip) {
-        let trimmed_param = param.trim();
-        let single_param: Vec<&str> = trimmed_param.split(':').collect();
-
-        final_params.push(ContractParam {
-            name: single_param[0].trim().to_string(),
-            param_type: single_param[1].trim().to_string(),
-        });
-    }
-    final_params
-}
