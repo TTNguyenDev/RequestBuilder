@@ -5,18 +5,31 @@ use std::io::{Write, BufReader, BufRead, Error};
 use std::str;
 use substring::Substring;
 
+
+// {
+// "inputs": [{internalType: uint256, name: "", type: uint256}]
+// name: string
+// outputs: [{internalType: uint256, name: "", type: uint256}]
+// stateMutability: 
+// type: 
+// }
+
+
+
 #[derive(Serialize, Deserialize, Debug)]
 struct ContractFunction {
     pub name: String,
-    pub return_type: String,
-    pub params: Vec<ContractParam>,
-    pub fn_type: String, //READ || WRITE
+    pub outputs: String,
+    pub state_mutability: String,
+    pub inputs: Vec<ContractParam>,
+    pub fn_type: String, //Function, event
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct ContractParam {
     name: String,
-    param_type: String,
+    internal_type: String,
+    param_type: String
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -109,22 +122,24 @@ fn main() {
                     "".as_bytes()
                 };
 
-                let return_type = str::from_utf8(return_type_u8).unwrap().to_string();
+                let outputs = str::from_utf8(return_type_u8).unwrap().to_string();
                 let fn_macro = str::from_utf8(macro_u8).unwrap();
 
                 let contract_fn = if fn_macro.is_empty() {
                  ContractFunction {
                     name,
-                    return_type,
-                    params: parse_params_(fn_params.to_string()).1,
-                    fn_type: parse_params_(fn_params.to_string()).0 
+                    outputs,
+                    inputs: parse_params_(fn_params.to_string()).1,
+                    fn_type: parse_params_(fn_params.to_string()).0,
+                    state_mutability: parse_params_(fn_params.to_string()).0 
                 } 
                 } else {
                  ContractFunction {
                     name,
-                    return_type,
-                    params: parse_params_(fn_params.to_string()).1,
-                    fn_type: fn_macro.to_string()
+                    outputs,
+                    inputs: parse_params_(fn_params.to_string()).1,
+                    fn_type: fn_macro.to_string(),
+                    state_mutability: fn_macro.to_string()
                 } 
                 };
 
@@ -166,6 +181,7 @@ fn parse_params_(params_string: String) -> (String, Vec<ContractParam>) {
                     Some(ContractParam {
                         name: r[0].trim().to_string(),
                         param_type: r[1].trim().to_string(),
+                        internal_type: r[1].trim().to_string()
                     })
                 }
             })
@@ -173,4 +189,3 @@ fn parse_params_(params_string: String) -> (String, Vec<ContractParam>) {
         (fn_type, param_pairs)
     }
 }
-
