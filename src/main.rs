@@ -172,9 +172,9 @@ fn parse_params_(params_string: String) -> (String, Vec<ContractParam>) {
                 let r = v.split(':').collect::<Vec<&str>>();
                 if r.len() == 1 {
                     if r[0] == "&mut self" {
-                        fn_type = "read".to_string();
-                    } else {
                         fn_type = "write".to_string();
+                    } else {
+                        fn_type = "read".to_string();
                     }
                     None
                 } else {
